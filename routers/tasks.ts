@@ -4,6 +4,7 @@ import User from "../models/User";
 import Task from "../models/Task";
 import {UserFields} from "../types";
 import auth from "../middleware/auth";
+import mongoDb from "../mongoDb";
 
 const tasksRouter = express.Router();
 
@@ -46,9 +47,8 @@ tasksRouter.post('/',auth, async (req, res, next) => {
     }
 });
 
-tasksRouter.get('/', auth, async (req, res, next) => {
+tasksRouter.get('/', async (req, res, next) => {
     try {
-        const user = (req as RequestWith).user;
         const user_id = req.query._id as string;
         const filter: {user?: string} = {};
 
@@ -61,21 +61,37 @@ tasksRouter.get('/', auth, async (req, res, next) => {
     }
 });
 
-tasksRouter.get('/:id', async (req, res, next) => {
-    const id = req.params.id;
 
+tasksRouter.delete('/:id',auth, async (req, res, next) => {
+    const taskId = req.params.id;
     try {
-        const product = await Task.findById(id);
+        const token = req.get('Authorization');
 
-        if (!product) {
-            res.status(404).send({message: 'Product not found'});
+        if (!token) {
+            res.status(401).send({ error: 'Authorization token required' });
             return;
         }
 
-        res.send(product);
-    } catch (e) {
-        next(e);
+        const user = await User.findById({token});
+        if (!user) {
+            res.status(401).send({ error: 'User not found' });
+            return;
+        }
+
+        const task = await Task.findOne({ _id: taskId, user: user._id });
+        if (!task) {
+            res.status(403).send({ error: 'You can delete only your own task' });
+            return;
+        }
+
+        await Task.deleteOne({ _id: taskId });
+        res.send({ message: 'Task deleted successfully' });
+        return;
+
+    } catch (error) {
+        next(error);
     }
 });
+
 
 export default tasksRouter;
