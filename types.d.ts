@@ -11,4 +11,5 @@ export interface User {
     title: string;
     description: string;
     status: string;
+    token: string;
 }
